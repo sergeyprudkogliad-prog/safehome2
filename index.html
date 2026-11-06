@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SafeHome</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#0f1a24;--card:#17252f;--text:#eaf1f5;--muted:#8ba0ad;--lamp:#ffc857;--ok:#5fd4a0;--off:#2a3b47}
+@media (prefers-color-scheme: light){:root{--bg:#eef3f6;--card:#fff;--text:#12202a;--muted:#5f7584;--lamp:#e8a20c;--ok:#1f9d6b;--off:#d5e0e7}}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom);display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+header{padding:20px 0 0}
+h1{font-size:26px;letter-spacing:-.5px}
+header p{color:var(--muted);font-size:14px;margin-top:2px}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
+.house{position:relative;width:210px;height:210px;border:0;border-radius:50%;background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:box-shadow .4s,color .4s,transform .15s}
+.house:active{transform:scale(.97)}
+.house svg{width:96px;height:96px}
+.house .win{fill:var(--off);transition:fill .4s}
+.house.on{color:var(--text);box-shadow:0 0 0 10px color-mix(in srgb,var(--lamp) 18%,transparent),0 0 60px color-mix(in srgb,var(--lamp) 35%,transparent)}
+.house.on .win{fill:var(--lamp)}
+.house.busy{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 14px color-mix(in srgb,var(--lamp) 14%,transparent)}}
+@media (prefers-reduced-motion:reduce){.house.busy{animation:none}}
+.state{text-align:center}
+.state b{display:block;font-size:22px}
+.state span{color:var(--muted);font-size:14px}
+.on-text{color:var(--ok)}
+.card{width:100%;background:var(--card);border-radius:18px;padding:6px 16px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;font-size:15px}
+.row+.row{border-top:1px solid var(--off)}
+.row small{color:var(--muted)}
+.row button{background:none;border:0;color:var(--text);font:inherit;display:flex;gap:8px;align-items:center;cursor:pointer;padding:0;width:100%;justify-content:space-between}
+footer{padding:16px 0 20px}
+.cta{width:100%;border:0;border-radius:14px;padding:15px;font:600 16px inherit;font-family:inherit;background:var(--lamp);color:#1b1500;cursor:pointer}
+.cta:focus-visible,.house:focus-visible,.row button:focus-visible{outline:3px solid var(--text);outline-offset:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>SafeHome</h1>
+  <p id="hi">Безопасный интернет у вас дома</p>
+</header>
+
+<main>
+  <button class="house" id="btn" aria-pressed="false" aria-label="Подключить VPN">
+    <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M12 44 48 14l36 30v34a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4z"/>
+      <rect class="win" x="36" y="46" width="24" height="26" rx="3" stroke="none"/>
+    </svg>
+  </button>
+  <div class="state"><b id="title">Отключено</b><span id="sub">Нажмите на дом, чтобы подключиться</span></div>
+
+  <div class="card">
+    <div class="row"><button id="loc"><span>Сервер</span><small id="locName">🇳🇱 Нидерланды</small></button></div>
+    <div class="row"><span>Подписка</span><small>активна до 30.12.2026</small></div>
+    <div class="row"><span>Трафик</span><small>без ограничений</small></div>
+  </div>
+</main>
+
+<footer><button class="cta" id="buy">Продлить подписку</button></footer>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const $ = id => document.getElementById(id);
+const btn = $('btn'), title = $('title'), sub = $('sub');
+const servers = ['🇳🇱 Нидерланды', '🇩🇪 Германия', '🇫🇮 Финляндия'];
+let si = 0, on = false, busy = false;
+
+if (tg) {
+  tg.ready(); tg.expand();
+  try { tg.setHeaderColor('secondary_bg_color'); } catch (e) {}
+  const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (u) $('hi').textContent = 'Дома, ' + u.first_name;
+}
+const haptic = t => { try { tg.HapticFeedback.impactOccurred(t) } catch (e) {} };
+
+btn.onclick = () => {
+  if (busy) return;
+  busy = true; haptic('medium');
+  btn.classList.add('busy');
+  title.textContent = on ? 'Отключаем…' : 'Подключаем…';
+  setTimeout(() => {
+    on = !on; busy = false;
+    btn.classList.remove('busy');
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on);
+    title.textContent = on ? 'Защищено' : 'Отключено';
+    title.className = on ? 'on-text' : '';
+    sub.textContent = on ? 'Свет горит — вы под защитой' : 'Нажмите на дом, чтобы подключиться';
+    try { tg.HapticFeedback.notificationOccurred('success') } catch (e) {}
+  }, 1200);
+};
+
+$('loc').onclick = () => {
+  if (on || busy) return;
+  si = (si + 1) % servers.length;
+  $('locName').textContent = servers[si];
+  haptic('light');
+};
+
+$('buy').onclick = () => {
+  const msg = 'Продление подписки скоро будет доступно';
+  tg && tg.showAlert ? tg.showAlert(msg) : alert(msg);
+};
+</script>
+</body>
+</html>
